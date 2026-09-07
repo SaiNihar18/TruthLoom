@@ -1,0 +1,277 @@
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background: #1c1b1f;
+  color: #e8e6ea;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sidebar h1 {
+  font-size: 22px;
+  letter-spacing: 0.02em;
+}
+
+.tagline {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #a8a5ad;
+}
+
+.upload-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.upload-button {
+  display: block;
+  text-align: center;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #7c4dff;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: #a8a5ad;
+}
+
+.upload-error {
+  font-size: 13px;
+  color: #ff8a80;
+}
+
+.document-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.document-item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.document-item:hover {
+  background: #2a2830;
+}
+
+.document-item.selected {
+  background: #3a2e6b;
+}
+
+.document-name {
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.document-fact-count {
+  font-size: 11px;
+  color: #a8a5ad;
+}
+
+.empty-hint {
+  color: #8a8790;
+  font-size: 13px;
+}
+
+.main-content {
+  flex: 1;
+  padding: 28px 32px;
+  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.facts-section h2,
+.evidence-column h2,
+.relationships-column h2 {
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: #1c1b1f;
+}
+
+.facts-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.facts-table th {
+  text-align: left;
+  background: #ece9f5;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #4a4650;
+}
+
+.facts-table td {
+  padding: 9px 12px;
+  border-top: 1px solid #ece9f5;
+}
+
+.fact-row {
+  cursor: pointer;
+}
+
+.fact-row:hover {
+  background: #f7f5fb;
+}
+
+.fact-row.selected {
+  background: #ede7ff;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.badge-ok {
+  background: #dff5e1;
+  color: #1e7d32;
+}
+
+.badge-caution {
+  background: #fff3d6;
+  color: #8a6100;
+}
+
+.badge-warn {
+  background: #ffe3e0;
+  color: #a4321f;
+}
+
+.badge-danger {
+  background: #ffdcdc;
+  color: #b3261e;
+}
+
+.detail-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 28px;
+}
+
+.evidence-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.evidence-quote {
+  font-style: italic;
+  color: #4a4650;
+  border-left: 3px solid #7c4dff;
+  padding-left: 10px;
+}
+
+.evidence-note {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  width: fit-content;
+}
+
+.evidence-note.ok {
+  background: #dff5e1;
+  color: #1e7d32;
+}
+
+.evidence-note.caution {
+  background: #fff3d6;
+  color: #8a6100;
+}
+
+.evidence-note.warn {
+  background: #ffe3e0;
+  color: #a4321f;
+}
+
+.page-frame {
+  position: relative;
+  border: 1px solid #ddd9e5;
+  border-radius: 6px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.page-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.highlight-box {
+  position: absolute;
+  border: 2px solid #e53935;
+  background: rgba(229, 57, 53, 0.18);
+  pointer-events: none;
+}
+
+.highlight-box.partial {
+  border-color: #f9a825;
+  background: rgba(249, 168, 37, 0.2);
+}
+
+.relationship-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.relationship-card {
+  background: white;
+  border-radius: 8px;
+  padding: 12px 14px;
+  border: 1px solid #ece9f5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.relationship-fact {
+  color: #1c1b1f;
+}
+
+.relationship-source {
+  font-size: 11px;
+  color: #8a8790;
+}
+
+.relationship-explanation {
+  color: #4a4650;
+}
