@@ -12,6 +12,7 @@ build/
 *.db
 *.sqlite3
 chroma_data/
+backend/uploads/
 
 .DS_Store
 Thumbs.db
