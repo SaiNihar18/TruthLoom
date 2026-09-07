@@ -45,7 +45,18 @@ def ingest_pdf(pdf_path: str, filename: str) -> tuple[dict, list[tuple]]:
     for raw_fact in raw_facts:
         page = raw_fact.get("page")
         quote = raw_fact.get("quote", "")
-        bbox = locate_quote(pdf_path, page, quote) if page and quote else None
+        bbox = (
+            locate_quote(pdf_path, page, quote, raw_fact.get("value"), raw_fact.get("unit"))
+            if page and quote
+            else None
+        )
+        if bbox:
+            # locate_quote may have resolved a printed page number to a
+            # different physical page, use that corrected page everywhere
+            # downstream (storage, image rendering) instead of the model's
+            # raw guess.
+            raw_fact = dict(raw_fact)
+            raw_fact["page"] = bbox["page"]
 
         try:
             embedding = embed_fact(raw_fact)
