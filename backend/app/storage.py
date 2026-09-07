@@ -2,6 +2,8 @@ import json
 import sqlite3
 from pathlib import Path
 
+import numpy as np
+
 DB_PATH = Path(__file__).resolve().parent.parent / "data.db"
 
 SCHEMA = """
@@ -24,7 +26,8 @@ CREATE TABLE IF NOT EXISTS facts (
     page INTEGER,
     bbox TEXT,
     grounded INTEGER NOT NULL,
-    partial_grounding INTEGER NOT NULL
+    partial_grounding INTEGER NOT NULL,
+    embedding BLOB
 );
 
 CREATE TABLE IF NOT EXISTS relationships (
@@ -62,14 +65,14 @@ def insert_document(filename: str, uploaded_at: str) -> int:
     return document_id
 
 
-def insert_fact(document_id: int, fact: dict, bbox: dict | None) -> int:
+def insert_fact(document_id: int, fact: dict, bbox: dict | None, embedding: np.ndarray | None) -> int:
     conn = get_connection()
     cursor = conn.execute(
         """
         INSERT INTO facts
             (document_id, subject, predicate, value, unit, time_period, scope,
-             quote, page, bbox, grounded, partial_grounding)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             quote, page, bbox, grounded, partial_grounding, embedding)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             document_id,
@@ -84,6 +87,7 @@ def insert_fact(document_id: int, fact: dict, bbox: dict | None) -> int:
             json.dumps(bbox) if bbox else None,
             1 if bbox else 0,
             1 if bbox and bbox.get("partial") else 0,
+            embedding.astype(np.float32).tobytes() if embedding is not None else None,
         ),
     )
     conn.commit()
@@ -92,11 +96,31 @@ def insert_fact(document_id: int, fact: dict, bbox: dict | None) -> int:
     return fact_id
 
 
-def _row_to_fact(row: sqlite3.Row) -> dict:
+def insert_relationship(fact_a_id: int, fact_b_id: int, relationship_type: str, explanation: str) -> int:
+    conn = get_connection()
+    cursor = conn.execute(
+        """
+        INSERT INTO relationships (fact_a_id, fact_b_id, relationship_type, explanation)
+        VALUES (?, ?, ?, ?)
+        """,
+        (fact_a_id, fact_b_id, relationship_type, explanation),
+    )
+    conn.commit()
+    relationship_id = cursor.lastrowid
+    conn.close()
+    return relationship_id
+
+
+def _row_to_fact(row: sqlite3.Row, include_embedding: bool = False) -> dict:
     fact = dict(row)
+    embedding_blob = fact.pop("embedding", None)
     fact["bbox"] = json.loads(fact["bbox"]) if fact["bbox"] else None
     fact["grounded"] = bool(fact["grounded"])
     fact["partial_grounding"] = bool(fact["partial_grounding"])
+    if include_embedding:
+        fact["embedding"] = (
+            np.frombuffer(embedding_blob, dtype=np.float32) if embedding_blob else None
+        )
     return fact
 
 
@@ -114,3 +138,37 @@ def get_all_facts() -> list[dict]:
     rows = conn.execute("SELECT * FROM facts").fetchall()
     conn.close()
     return [_row_to_fact(row) for row in rows]
+
+
+def get_facts_from_other_documents(document_id: int) -> list[dict]:
+    """Facts with their embeddings, used only for candidate matching."""
+    conn = get_connection()
+    rows = conn.execute(
+        """
+        SELECT facts.*, documents.filename AS document_filename
+        FROM facts JOIN documents ON facts.document_id = documents.id
+        WHERE facts.document_id != ? AND facts.embedding IS NOT NULL
+        """,
+        (document_id,),
+    ).fetchall()
+    conn.close()
+    return [_row_to_fact(row, include_embedding=True) for row in rows]
+
+
+def get_document_filename(document_id: int) -> str:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT filename FROM documents WHERE id = ?", (document_id,)
+    ).fetchone()
+    conn.close()
+    return row["filename"] if row else "unknown document"
+
+
+def get_relationships_for_fact(fact_id: int) -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM relationships WHERE fact_a_id = ? OR fact_b_id = ?",
+        (fact_id, fact_id),
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]

@@ -5,6 +5,7 @@ from .base import ExtractionProvider, ReasoningProvider
 from .gemini_provider import GeminiProvider
 from .groq_provider import GroqProvider
 from .openrouter_provider import OpenRouterProvider
+from .openrouter_text_provider import OpenRouterTextProvider
 
 logger = logging.getLogger(__name__)
 
@@ -34,5 +35,5 @@ def extract_facts(pdf_path: str, prompt: str) -> str:
 
 
 def reason_about_facts(prompt: str) -> str:
-    providers: list[ReasoningProvider] = [GroqProvider()]
+    providers: list[ReasoningProvider] = [GroqProvider(), OpenRouterTextProvider()]
     return _run_with_fallback(providers, lambda p: p.complete(prompt))

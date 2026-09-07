@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import storage
-from .ingest import ingest_pdf
+from .ingest import ingest_pdf, process_relationships
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -30,18 +30,28 @@ def health():
 
 
 @app.post("/documents")
-async def upload_document(file: UploadFile):
+def upload_document(file: UploadFile, background_tasks: BackgroundTasks):
+    # Plain def, not async def: extraction and comparison calls are blocking
+    # network I/O, and FastAPI runs sync path functions in a worker thread
+    # instead of the main event loop, so a slow upload doesn't freeze every
+    # other request.
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF files are supported")
 
     dest_path = UPLOAD_DIR / file.filename
-    contents = await file.read()
+    contents = file.file.read()
     dest_path.write_bytes(contents)
 
     try:
-        result = ingest_pdf(str(dest_path), file.filename)
+        result, pending_groups = ingest_pdf(str(dest_path), file.filename)
     except ValueError as exc:
         raise HTTPException(502, str(exc)) from exc
+
+    # Facts come back immediately. Cross-document relationship classification
+    # runs after the response is sent, since each fact's candidates need
+    # their own reasoning call and shouldn't hold up showing the extracted
+    # facts.
+    background_tasks.add_task(process_relationships, pending_groups)
 
     return result
 
@@ -54,3 +64,8 @@ def get_document_facts(document_id: int):
 @app.get("/facts")
 def get_all_facts():
     return storage.get_all_facts()
+
+
+@app.get("/facts/{fact_id}/relationships")
+def get_fact_relationships(fact_id: int):
+    return storage.get_relationships_for_fact(fact_id)

@@ -4,9 +4,11 @@ import re
 from datetime import datetime, timezone
 
 from . import storage
+from .embeddings import embed_fact
 from .extraction_prompt import FACT_EXTRACTION_PROMPT
 from .grounding import locate_quote
 from .providers.fallback import extract_facts
+from .reasoning import classify_many_grouped, find_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +18,14 @@ def _parse_facts_json(raw: str) -> list[dict]:
     return json.loads(cleaned)
 
 
-def ingest_pdf(pdf_path: str, filename: str) -> dict:
+def ingest_pdf(pdf_path: str, filename: str) -> tuple[dict, list[tuple]]:
     """Run a PDF through extraction and grounding and store the result.
 
-    Returns the document id and the facts that came out of it, including
-    which ones we could and couldn't verify against the PDF's text layer.
+    Returns the document id and facts right away, since that's a single
+    extraction call. Candidate cross-document pairs are also returned but
+    NOT classified here, that step is comparatively slow (one reasoning
+    call per candidate pair) and is meant to run as a background task after
+    the response to the caller has already gone out.
     """
     raw_output = extract_facts(pdf_path, FACT_EXTRACTION_PROMPT)
 
@@ -33,12 +38,22 @@ def ingest_pdf(pdf_path: str, filename: str) -> dict:
     uploaded_at = datetime.now(timezone.utc).isoformat()
     document_id = storage.insert_document(filename, uploaded_at)
 
+    other_facts = storage.get_facts_from_other_documents(document_id)
+
     stored_facts = []
+    pending_groups = []
     for raw_fact in raw_facts:
         page = raw_fact.get("page")
         quote = raw_fact.get("quote", "")
         bbox = locate_quote(pdf_path, page, quote) if page and quote else None
-        fact_id = storage.insert_fact(document_id, raw_fact, bbox)
+
+        try:
+            embedding = embed_fact(raw_fact)
+        except Exception:
+            logger.exception("Embedding failed for fact, skipping cross-document matching")
+            embedding = None
+
+        fact_id = storage.insert_fact(document_id, raw_fact, bbox, embedding)
         stored = dict(raw_fact)
         stored["id"] = fact_id
         stored["document_id"] = document_id
@@ -47,4 +62,28 @@ def ingest_pdf(pdf_path: str, filename: str) -> dict:
         stored["bbox"] = bbox
         stored_facts.append(stored)
 
-    return {"document_id": document_id, "facts": stored_facts}
+        if embedding is None:
+            continue
+
+        new_fact_for_matching = dict(raw_fact)
+        new_fact_for_matching["embedding"] = embedding
+        candidates = find_candidates(new_fact_for_matching, other_facts)
+        if candidates:
+            pending_groups.append((fact_id, raw_fact, filename, candidates))
+
+    pending_pair_count = sum(len(candidates) for _, _, _, candidates in pending_groups)
+    result = {"document_id": document_id, "facts": stored_facts, "relationships_pending": pending_pair_count}
+    return result, pending_groups
+
+
+def process_relationships(groups: list[tuple]) -> None:
+    """Classify grouped candidate sets concurrently and store the results."""
+    if not groups:
+        return
+
+    classified = classify_many_grouped(groups)
+    for fact_id, candidate_id, result in classified:
+        relationship_type = result.get("relationship", "unrelated")
+        if relationship_type == "unrelated":
+            continue
+        storage.insert_relationship(fact_id, candidate_id, relationship_type, result.get("explanation", ""))
