@@ -170,5 +170,39 @@ def get_relationships_for_fact(fact_id: int) -> list[dict]:
         "SELECT * FROM relationships WHERE fact_a_id = ? OR fact_b_id = ?",
         (fact_id, fact_id),
     ).fetchall()
+
+    results = []
+    for row in rows:
+        other_id = row["fact_b_id"] if row["fact_a_id"] == fact_id else row["fact_a_id"]
+        other_row = conn.execute(
+            """
+            SELECT facts.*, documents.filename AS document_filename
+            FROM facts JOIN documents ON facts.document_id = documents.id
+            WHERE facts.id = ?
+            """,
+            (other_id,),
+        ).fetchone()
+        results.append(
+            {
+                "relationship_type": row["relationship_type"],
+                "explanation": row["explanation"],
+                "other_fact": _row_to_fact(other_row) if other_row else None,
+            }
+        )
+    conn.close()
+    return results
+
+
+def get_all_documents() -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute(
+        """
+        SELECT documents.id, documents.filename, documents.uploaded_at,
+               COUNT(facts.id) AS fact_count
+        FROM documents LEFT JOIN facts ON facts.document_id = documents.id
+        GROUP BY documents.id
+        ORDER BY documents.id
+        """
+    ).fetchall()
     conn.close()
     return [dict(row) for row in rows]

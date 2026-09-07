@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, UploadFile
+import fitz
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import storage
@@ -8,6 +9,8 @@ from .ingest import ingest_pdf, process_relationships
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+PAGE_IMAGE_DPI = 150
 
 app = FastAPI(title="TruthLoom")
 
@@ -56,6 +59,11 @@ def upload_document(file: UploadFile, background_tasks: BackgroundTasks):
     return result
 
 
+@app.get("/documents")
+def list_documents():
+    return storage.get_all_documents()
+
+
 @app.get("/documents/{document_id}/facts")
 def get_document_facts(document_id: int):
     return storage.get_facts_for_document(document_id)
@@ -69,3 +77,38 @@ def get_all_facts():
 @app.get("/facts/{fact_id}/relationships")
 def get_fact_relationships(fact_id: int):
     return storage.get_relationships_for_fact(fact_id)
+
+
+def _open_document_pdf(document_id: int, page_number: int) -> tuple[fitz.Document, fitz.Page]:
+    filename = storage.get_document_filename(document_id)
+    pdf_path = UPLOAD_DIR / filename
+    if not pdf_path.exists():
+        raise HTTPException(404, "Source PDF is no longer available on the server")
+
+    doc = fitz.open(str(pdf_path))
+    if page_number < 1 or page_number > len(doc):
+        doc.close()
+        raise HTTPException(404, "Page out of range for this document")
+    return doc, doc[page_number - 1]
+
+
+@app.get("/documents/{document_id}/pages/{page_number}/meta")
+def get_page_meta(document_id: int, page_number: int):
+    doc, page = _open_document_pdf(document_id, page_number)
+    rect = page.rect
+    doc.close()
+    return {
+        "width_points": rect.width,
+        "height_points": rect.height,
+        "dpi": PAGE_IMAGE_DPI,
+        "scale": PAGE_IMAGE_DPI / 72,
+    }
+
+
+@app.get("/documents/{document_id}/pages/{page_number}/image")
+def get_page_image(document_id: int, page_number: int):
+    doc, page = _open_document_pdf(document_id, page_number)
+    pixmap = page.get_pixmap(dpi=PAGE_IMAGE_DPI)
+    png_bytes = pixmap.tobytes("png")
+    doc.close()
+    return Response(content=png_bytes, media_type="image/png")
