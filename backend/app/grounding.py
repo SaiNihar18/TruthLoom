@@ -54,18 +54,55 @@ def _build_printed_page_index(pdf_path: str) -> dict[int, int]:
 
 
 def _union_rect(rects) -> fitz.Rect:
-    """Combine several rects into one bounding box.
-
-    A distinctive multi-word search string that wraps across a line break
-    comes back from search_for as several word-level rects for that single
-    occurrence, not several separate matches, so the right box to highlight
-    is their union, not just the first fragment.
-    """
+    """Combine several rects (already known to belong together) into one box."""
     x0 = min(r.x0 for r in rects)
     y0 = min(r.y0 for r in rects)
     x1 = max(r.x1 for r in rects)
     y1 = max(r.y1 for r in rects)
     return fitz.Rect(x0, y0, x1, y1)
+
+
+def _cluster_rects(rects) -> list[list]:
+    """Group rects into clusters that each represent one contiguous occurrence.
+
+    search_for returns several rects for a single occurrence that wraps
+    across a line break, but also one rect per occurrence when a short or
+    common search string (e.g. "Customers", which can match a table's row
+    label and, case-insensitively, the word "customers" in an unrelated
+    sentence elsewhere on the page) repeats at unrelated spots. Rect count
+    alone can't tell those apart, only proximity can: rects that are on the
+    same line and close together, or on the very next line down, are one
+    occurrence, anything farther is a separate one.
+    """
+    ordered = sorted(rects, key=lambda r: (round(r.y0, 1), r.x0))
+    clusters = [[ordered[0]]]
+    for rect in ordered[1:]:
+        prev = clusters[-1][-1]
+        line_height = prev.y1 - prev.y0
+        same_line = abs(rect.y0 - prev.y0) < 2
+        next_line_down = 0 <= (rect.y0 - prev.y1) < line_height * 1.5
+        close_enough = (same_line and (rect.x0 - prev.x1) < 30) or next_line_down
+        if close_enough:
+            clusters[-1].append(rect)
+        else:
+            clusters.append([rect])
+    return clusters
+
+
+def _unambiguous_match(rects):
+    """Return the rects for a search hit only if it occurred exactly once.
+
+    A hit that clusters into more than one group means the search string
+    turned up in two unrelated places on the page. Guessing which one is
+    right (e.g. always the first) is exactly how a short, common label like
+    "Customers" can get confidently pointed at the wrong occurrence. Safer
+    to say "not found here" and let a weaker fallback, or nothing, take
+    over than to highlight a plausible-looking wrong spot.
+    """
+    if not rects:
+        return None
+    clusters = _cluster_rects(rects)
+    return clusters[0] if len(clusters) == 1 else None
 
 
 def _locate_on_physical_page(
@@ -77,19 +114,17 @@ def _locate_on_physical_page(
     page = doc[physical_index]
     partial = False
 
-    rects = page.search_for(quote)
-    if not rects:
-        rects = page.search_for(_normalize(quote))
-    if not rects:
+    match = _unambiguous_match(page.search_for(quote))
+    if not match:
+        match = _unambiguous_match(page.search_for(_normalize(quote)))
+    if not match:
         label = _longest_label_segment(quote)
         if label:
-            rects = page.search_for(label)
-            partial = bool(rects)
+            match = _unambiguous_match(page.search_for(label))
+            partial = match is not None
 
-    if rects:
-        # These are all long, distinctive strings, so several rects mean
-        # fragments of one match, safe to merge into a single box.
-        rect = _union_rect(rects)
+    if match:
+        rect = _union_rect(match)
     elif value:
         # Last resort: the value itself, when the surrounding sentence has
         # been paraphrased enough that nothing else matches. Unlike the
