@@ -160,6 +160,47 @@ def get_facts_from_other_documents(document_id: int) -> list[dict]:
     return [_row_to_fact(row, include_embedding=True) for row in rows]
 
 
+def delete_document(document_id: int) -> str | None:
+    """Delete a document and everything derived from it.
+
+    That means its own facts, and any relationship where EITHER side is one
+    of those facts, not just relationships this document happens to own.
+    A relationship row can have fact_a in this document and fact_b in some
+    other document (or vice versa), so both columns are checked; otherwise
+    deleting this document would leave the other document pointing at a
+    fact that no longer exists.
+
+    Returns the filename that was deleted (so the caller can also remove
+    the file from disk), or None if there was no such document.
+    """
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT filename FROM documents WHERE id = ?", (document_id,)).fetchone()
+        if row is None:
+            return None
+        filename = row["filename"]
+
+        # Relationships first, they reference facts. Then facts, they
+        # reference the document. Then the document itself.
+        conn.execute(
+            """
+            DELETE FROM relationships
+            WHERE fact_a_id IN (SELECT id FROM facts WHERE document_id = ?)
+               OR fact_b_id IN (SELECT id FROM facts WHERE document_id = ?)
+            """,
+            (document_id, document_id),
+        )
+        conn.execute("DELETE FROM facts WHERE document_id = ?", (document_id,))
+        conn.execute("DELETE FROM documents WHERE id = ?", (document_id,))
+        conn.commit()
+        return filename
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def get_document_filename(document_id: int) -> str:
     conn = get_connection()
     row = conn.execute(

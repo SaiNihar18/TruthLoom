@@ -9,7 +9,16 @@ function fitZoom(imageWidth, imageHeight) {
   return Math.min(1, fitW, fitH);
 }
 
-export default function PageViewerModal({ imageUrl, imageWidth, imageHeight, bbox, scale, pageLabel, onClose }) {
+export default function PageViewerModal({
+  imageUrl,
+  imageWidth,
+  imageHeight,
+  bbox,
+  scale,
+  pageLabel,
+  downloadHref,
+  onClose,
+}) {
   const [zoom, setZoom] = useState(() => fitZoom(imageWidth, imageHeight));
 
   useEffect(() => {
@@ -51,6 +60,11 @@ export default function PageViewerModal({ imageUrl, imageWidth, imageHeight, bbo
             <button className="link-button" onClick={zoomFit}>
               Fit
             </button>
+            {downloadHref && (
+              <a className="link-button" href={downloadHref}>
+                Download PDF
+              </a>
+            )}
           </div>
           <button className="page-modal-close" onClick={onClose} aria-label="Close">
             ×

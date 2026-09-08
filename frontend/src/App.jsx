@@ -8,7 +8,7 @@ import RelationshipsPanel from "./components/RelationshipsPanel";
 import SummaryLine from "./components/SummaryLine";
 import FindingsView from "./components/FindingsView";
 import LoadingLine from "./components/LoadingLine";
-import { listDocuments, getDocumentFacts, getAllFacts, getAllRelationships } from "./api";
+import { listDocuments, getDocumentFacts, getAllFacts, getAllRelationships, deleteDocument } from "./api";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("documents");
@@ -70,6 +70,27 @@ export default function App() {
     setActiveTab("documents");
   }
 
+  async function handleDelete(documentId, filename) {
+    const label = filename || `document ${documentId}`;
+    const confirmed = window.confirm(
+      `Delete "${label}"?\n\nThis removes all its facts and any relationships to other documents. This can't be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteDocument(documentId);
+    } catch (err) {
+      setLoadError(err.message);
+      return;
+    }
+
+    if (selectedDocumentId === documentId) {
+      setSelectedDocumentId(null);
+      setSelectedFact(null);
+    }
+    refreshEverything();
+  }
+
   function goToFact(documentId, factId) {
     setActiveTab("documents");
     setSelectedFact(null);
@@ -125,6 +146,7 @@ export default function App() {
                 setSelectedDocumentId(id);
                 setSelectedFact(null);
               }}
+              onDelete={handleDelete}
             />
           </aside>
 

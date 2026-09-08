@@ -4,7 +4,7 @@ from pathlib import Path
 import fitz
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from . import storage
 from .ingest import ingest_pdf, process_relationships
@@ -92,6 +92,24 @@ def list_documents():
 @app.get("/documents/{document_id}/facts")
 def get_document_facts(document_id: int):
     return storage.get_facts_for_document(document_id)
+
+
+@app.get("/documents/{document_id}/download")
+def download_document(document_id: int):
+    filename = storage.get_document_filename(document_id)
+    pdf_path = UPLOAD_DIR / filename
+    if not pdf_path.exists():
+        raise HTTPException(404, "Source PDF is no longer available on the server")
+    return FileResponse(pdf_path, media_type="application/pdf", filename=filename)
+
+
+@app.delete("/documents/{document_id}")
+def delete_document(document_id: int):
+    filename = storage.delete_document(document_id)
+    if filename is None:
+        raise HTTPException(404, "Document not found")
+    (UPLOAD_DIR / filename).unlink(missing_ok=True)
+    return {"deleted": True, "document_id": document_id}
 
 
 @app.get("/facts")

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getPageMeta, pageImageUrl } from "../api";
+import { getPageMeta, pageImageUrl, downloadUrl } from "../api";
 import LoadingLine from "./LoadingLine";
 import PageViewerModal from "./PageViewerModal";
 
@@ -98,6 +98,7 @@ export default function EvidenceViewer({ documentId, documentName, fact }) {
           bbox={bbox}
           scale={meta.scale}
           pageLabel={`${documentName ? documentName + " · " : ""}Page ${fact.page}`}
+          downloadHref={downloadUrl(documentId)}
           onClose={() => setExpanded(false)}
         />
       )}

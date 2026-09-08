@@ -48,3 +48,11 @@ export function getPageMeta(documentId, page) {
 export function pageImageUrl(documentId, page) {
   return `${API_BASE}/documents/${documentId}/pages/${page}/image`;
 }
+
+export function downloadUrl(documentId) {
+  return `${API_BASE}/documents/${documentId}/download`;
+}
+
+export function deleteDocument(documentId) {
+  return request(`/documents/${documentId}`, { method: "DELETE" });
+}

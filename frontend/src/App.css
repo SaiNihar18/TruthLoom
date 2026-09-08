@@ -240,8 +240,9 @@ a {
   border-radius: 6px;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .document-item:hover {
@@ -250,6 +251,52 @@ a {
 
 .document-item.selected {
   background: #efe9ff;
+}
+
+.document-item-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.document-item-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.document-item:hover .document-item-actions,
+.document-item:focus-within .document-item-actions {
+  opacity: 1;
+}
+
+.icon-button {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 5px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.icon-button:hover {
+  background: rgba(20, 18, 30, 0.08);
+  color: var(--ink);
+}
+
+.icon-button.danger:hover {
+  background: var(--danger-bg, #ffdcdc);
+  color: var(--danger-fg);
 }
 
 .document-name {
