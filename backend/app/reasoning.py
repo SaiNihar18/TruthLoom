@@ -10,19 +10,33 @@ from .providers.fallback import reason_about_facts
 logger = logging.getLogger(__name__)
 
 MIN_SIMILARITY = 0.55
-MAX_CANDIDATES = 3
+# As more documents restate the same figures, several near-duplicate
+# candidates (e.g. the same revenue number appearing in two other
+# documents) can crowd out a genuinely different, more interesting match
+# (e.g. a forecast vs. the actual outcome) that just ranks slightly lower
+# by embedding similarity. Keeping this modestly wider reduces how often
+# that happens without letting a batch call grow unbounded.
+MAX_CANDIDATES = 5
 
 RELATIONSHIP_RULES = """Choose exactly one relationship for each pair:
-- "corroborates": both facts state the same underlying claim, even if worded
+- "corroborates": both facts state the same underlying claim, the same kind
+  of figure for the same subject, time period, and scope, even if worded
   differently, rounded differently, or phrased with different units that
-  convert to the same value.
+  convert to the same value. Both sides must be the same KIND of claim, two
+  realized/actual figures, or two of the same named event. A forecast,
+  target, or expectation is a different kind of claim from a realized or
+  reported figure, so it never corroborates one, even when the actual
+  figure satisfies the expectation, see the reconcilable example below.
 - "contradicts": the facts make incompatible claims about the same subject,
   time period, and scope, and the difference cannot be explained by time,
   scope, or units.
 - "reconcilable": the facts appear to differ but can be explained by
   different time periods, scopes, units, or context, for example one is
-  provisional and the other final, or one is standalone and the other
-  consolidated.
+  provisional and the other final, one is standalone and the other
+  consolidated, or one is a forecast/target/expectation and the other is
+  the actual/realized outcome for that same period (even if the outcome
+  met or beat the forecast, a projection and a result are still different
+  kinds of claims, not the same claim confirmed twice).
 - "unrelated": the facts are not meaningfully comparable even though they
   looked similar enough to compare."""
 

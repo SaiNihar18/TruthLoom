@@ -45,7 +45,15 @@ export default function FactsTable({ facts, relationships, selectedFactId, onSel
                 </td>
                 <td>
                   {summary ? (
-                    <span className={`status-text ${summary.className}`}>{summary.label}</span>
+                    <span className={`status-text ${summary.className}`}>
+                      {summary.label}
+                      {summary.hasOtherTypes && (
+                        <span className="status-more" title="This fact has more than one kind of relationship, see below">
+                          {" "}
+                          +more
+                        </span>
+                      )}
+                    </span>
                   ) : (
                     <span className="status-text status-muted">-</span>
                   )}

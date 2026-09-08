@@ -455,6 +455,12 @@ a {
   font-weight: 400;
 }
 
+.status-more {
+  color: var(--ink-muted);
+  font-weight: 400;
+  font-style: italic;
+}
+
 /* Detail section: evidence + related info, side by side, light divider not cards */
 
 .detail-section {

@@ -1,9 +1,13 @@
-// A fact can be involved in several relationships at once (e.g. corroborated
-// by one document and contradicted by another). When we need a single
-// headline status for a compact view, contradictions take priority since
-// they're the thing a reader most needs to notice, then reconciled
-// differences, then corroboration.
-const PRIORITY = ["contradicts", "reconcilable", "corroborates"];
+// A fact can be involved in several relationships at once, e.g. corroborated
+// word for word by one document and only loosely reconciled with an
+// unrelated-scope fact from another. When we need a single headline status
+// for a compact view, contradictions take priority since they're the thing
+// a reader most needs to notice, then corroboration, since an exact
+// independent match is a stronger and more specific finding than a
+// difference that merely got explained away, then reconciled differences.
+// The count below still reflects every relationship, so a fact with more
+// than one is never silently reduced to just the headline type.
+const PRIORITY = ["contradicts", "corroborates", "reconcilable"];
 
 const STATUS_INFO = {
   corroborates: { label: "Corroborated", className: "status-ok" },
@@ -22,6 +26,7 @@ export function getFactRelationshipSummary(factId, relationships) {
   return {
     type: primaryType,
     count: touching.length,
+    hasOtherTypes: types.size > 1,
     ...STATUS_INFO[primaryType],
   };
 }
