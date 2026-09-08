@@ -187,7 +187,16 @@ body {
 
 .document-name {
   font-size: 13px;
+  font-weight: 500;
   color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-original-name {
+  font-size: 10.5px;
+  color: var(--ink-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -196,6 +205,7 @@ body {
 .document-fact-count {
   font-size: 11px;
   color: var(--ink-muted);
+  margin-top: 1px;
 }
 
 .empty-hint {

@@ -2,47 +2,58 @@ import { useRef, useState } from "react";
 import { uploadDocument } from "../api";
 
 export default function UploadPanel({ onUploaded }) {
-  const [status, setStatus] = useState("idle");
-  const [error, setError] = useState(null);
+  const [progress, setProgress] = useState(null);
+  const [errors, setErrors] = useState([]);
   const inputRef = useRef(null);
 
   async function handleFileChange(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
 
-    setStatus("uploading");
-    setError(null);
-    try {
-      const result = await uploadDocument(file);
-      setStatus("idle");
-      onUploaded(result);
-    } catch (err) {
-      setStatus("idle");
-      setError(err.message);
-    } finally {
-      if (inputRef.current) inputRef.current.value = "";
+    setErrors([]);
+    const failed = [];
+
+    for (let i = 0; i < files.length; i++) {
+      setProgress({ index: i + 1, total: files.length, name: files[i].name });
+      try {
+        const result = await uploadDocument(files[i]);
+        onUploaded(result);
+      } catch (err) {
+        failed.push(`${files[i].name}: ${err.message}`);
+      }
     }
+
+    setProgress(null);
+    setErrors(failed);
+    if (inputRef.current) inputRef.current.value = "";
   }
+
+  const uploading = progress !== null;
 
   return (
     <div className="upload-panel">
       <label className="upload-button">
-        {status === "uploading" ? "Extracting facts..." : "+ Add documents"}
+        {uploading ? `Uploading ${progress.index} of ${progress.total}...` : "+ Add documents"}
         <input
           ref={inputRef}
           type="file"
           accept="application/pdf"
+          multiple
           onChange={handleFileChange}
-          disabled={status === "uploading"}
+          disabled={uploading}
           hidden
         />
       </label>
-      {status === "uploading" && (
+      {uploading && (
         <p className="upload-hint">
-          Reading the document and extracting facts, this can take a minute or two for a large PDF.
+          Reading {progress.name}, this can take a minute or two for a large PDF.
         </p>
       )}
-      {error && <p className="upload-error">{error}</p>}
+      {errors.map((message, i) => (
+        <p key={i} className="upload-error">
+          {message}
+        </p>
+      ))}
     </div>
   );
 }
