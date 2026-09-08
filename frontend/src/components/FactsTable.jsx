@@ -6,46 +6,48 @@ function groundingLabel(fact) {
 
 export default function FactsTable({ facts, selectedFactId, onSelect }) {
   if (facts.length === 0) {
-    return <p className="empty-hint">Select a document to see its facts.</p>;
+    return <p className="empty-hint">This document has no extracted facts.</p>;
   }
 
   return (
-    <table className="facts-table">
-      <thead>
-        <tr>
-          <th>Subject</th>
-          <th>Predicate</th>
-          <th>Value</th>
-          <th>Period</th>
-          <th>Scope</th>
-          <th>Page</th>
-          <th>Evidence</th>
-        </tr>
-      </thead>
-      <tbody>
-        {facts.map((fact) => {
-          const grounding = groundingLabel(fact);
-          return (
-            <tr
-              key={fact.id}
-              className={fact.id === selectedFactId ? "fact-row selected" : "fact-row"}
-              onClick={() => onSelect(fact)}
-            >
-              <td>{fact.subject}</td>
-              <td>{fact.predicate}</td>
-              <td>
-                {fact.value} {fact.unit || ""}
-              </td>
-              <td>{fact.time_period || "-"}</td>
-              <td>{fact.scope || "-"}</td>
-              <td>{fact.page ?? "-"}</td>
-              <td>
-                <span className={grounding.className}>{grounding.text}</span>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="facts-table-wrap">
+      <table className="facts-table">
+        <thead>
+          <tr>
+            <th>Subject</th>
+            <th>Predicate</th>
+            <th>Value</th>
+            <th>Period</th>
+            <th>Scope</th>
+            <th>Page</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {facts.map((fact) => {
+            const grounding = groundingLabel(fact);
+            return (
+              <tr
+                key={fact.id}
+                className={fact.id === selectedFactId ? "fact-row selected" : "fact-row"}
+                onClick={() => onSelect(fact)}
+              >
+                <td>{fact.subject}</td>
+                <td>{fact.predicate}</td>
+                <td>
+                  {fact.value} {fact.unit || ""}
+                </td>
+                <td>{fact.time_period || "-"}</td>
+                <td>{fact.scope || "-"}</td>
+                <td>{fact.page ?? "-"}</td>
+                <td>
+                  <span className={grounding.className}>{grounding.text}</span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

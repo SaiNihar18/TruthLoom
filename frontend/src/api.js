@@ -4,7 +4,13 @@ async function request(path, options) {
   const response = await fetch(`${API_BASE}${path}`, options);
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`${response.status}: ${body}`);
+    let message = body;
+    try {
+      message = JSON.parse(body).detail || body;
+    } catch {
+      // body wasn't JSON, use it as-is
+    }
+    throw new Error(message);
   }
   return response.json();
 }
@@ -25,6 +31,14 @@ export function getDocumentFacts(documentId) {
 
 export function getFactRelationships(factId) {
   return request(`/facts/${factId}/relationships`);
+}
+
+export function getAllFacts() {
+  return request("/facts");
+}
+
+export function getAllRelationships() {
+  return request("/relationships");
 }
 
 export function getPageMeta(documentId, page) {
