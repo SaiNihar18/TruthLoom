@@ -135,7 +135,12 @@ def get_facts_for_document(document_id: int) -> list[dict]:
 
 def get_all_facts() -> list[dict]:
     conn = get_connection()
-    rows = conn.execute("SELECT * FROM facts").fetchall()
+    rows = conn.execute(
+        """
+        SELECT facts.*, documents.filename AS document_filename
+        FROM facts JOIN documents ON facts.document_id = documents.id
+        """
+    ).fetchall()
     conn.close()
     return [_row_to_fact(row) for row in rows]
 
@@ -189,6 +194,35 @@ def get_relationships_for_fact(fact_id: int) -> list[dict]:
                 "other_fact": _row_to_fact(other_row) if other_row else None,
             }
         )
+    conn.close()
+    return results
+
+
+def get_all_relationships() -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM relationships ORDER BY id").fetchall()
+
+    def fetch_fact(fact_id: int) -> dict | None:
+        row = conn.execute(
+            """
+            SELECT facts.*, documents.filename AS document_filename
+            FROM facts JOIN documents ON facts.document_id = documents.id
+            WHERE facts.id = ?
+            """,
+            (fact_id,),
+        ).fetchone()
+        return _row_to_fact(row) if row else None
+
+    results = [
+        {
+            "id": row["id"],
+            "relationship_type": row["relationship_type"],
+            "explanation": row["explanation"],
+            "fact_a": fetch_fact(row["fact_a_id"]),
+            "fact_b": fetch_fact(row["fact_b_id"]),
+        }
+        for row in rows
+    ]
     conn.close()
     return results
 

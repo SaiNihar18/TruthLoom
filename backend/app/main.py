@@ -1,11 +1,15 @@
+import logging
 from pathlib import Path
 
 import fitz
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Response, UploadFile
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from . import storage
 from .ingest import ingest_pdf, process_relationships
+
+logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -25,6 +29,18 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     storage.init_db()
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    # An exception that reaches here would otherwise be handled by
+    # Starlette's outermost error middleware, which sits outside
+    # CORSMiddleware and so returns a response with no CORS headers at all.
+    # Browsers report that as a CORS failure, hiding the real error. Handling
+    # it here keeps the response inside the normal middleware stack so the
+    # browser actually sees the error instead of a misleading CORS message.
+    logger.exception("Unhandled error while processing %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error, check the server log."})
 
 
 @app.get("/health")
@@ -48,7 +64,16 @@ def upload_document(file: UploadFile, background_tasks: BackgroundTasks):
     try:
         result, pending_groups = ingest_pdf(str(dest_path), file.filename)
     except ValueError as exc:
+        dest_path.unlink(missing_ok=True)
         raise HTTPException(502, str(exc)) from exc
+    except RuntimeError as exc:
+        dest_path.unlink(missing_ok=True)
+        raise HTTPException(
+            503,
+            "Extraction failed because all configured LLM providers are currently rate "
+            "limited or have hit their usage quota. This is a free tier limit, not a bug, "
+            "wait a bit and try again.",
+        ) from exc
 
     # Facts come back immediately. Cross-document relationship classification
     # runs after the response is sent, since each fact's candidates need
@@ -77,6 +102,11 @@ def get_all_facts():
 @app.get("/facts/{fact_id}/relationships")
 def get_fact_relationships(fact_id: int):
     return storage.get_relationships_for_fact(fact_id)
+
+
+@app.get("/relationships")
+def list_relationships():
+    return storage.get_all_relationships()
 
 
 def _open_document_pdf(document_id: int, page_number: int) -> tuple[fitz.Document, fitz.Page]:
