@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getPageMeta, pageImageUrl } from "../api";
 import LoadingLine from "./LoadingLine";
+import PageViewerModal from "./PageViewerModal";
 
 const CROP_HEIGHT = 220;
 
@@ -83,27 +84,22 @@ export default function EvidenceViewer({ documentId, documentName, fact }) {
               />
             )}
           </div>
-          <button className="link-button" onClick={() => setExpanded((v) => !v)}>
-            {expanded ? "Hide full page" : "View full page →"}
+          <button className="link-button" onClick={() => setExpanded(true)}>
+            View full page →
           </button>
         </>
       )}
 
       {expanded && meta && (
-        <div className="page-frame fade-in" style={{ width: imageWidth }}>
-          <img src={pageImageUrl(documentId, fact.page)} alt={`Page ${fact.page} full`} className="page-image loaded" />
-          {bbox && (
-            <div
-              className={bbox.partial ? "highlight-box partial" : "highlight-box"}
-              style={{
-                left: bbox.x0 * meta.scale,
-                top: bbox.y0 * meta.scale,
-                width: (bbox.x1 - bbox.x0) * meta.scale,
-                height: (bbox.y1 - bbox.y0) * meta.scale,
-              }}
-            />
-          )}
-        </div>
+        <PageViewerModal
+          imageUrl={pageImageUrl(documentId, fact.page)}
+          imageWidth={imageWidth}
+          imageHeight={imageHeight}
+          bbox={bbox}
+          scale={meta.scale}
+          pageLabel={`${documentName ? documentName + " · " : ""}Page ${fact.page}`}
+          onClose={() => setExpanded(false)}
+        />
       )}
     </div>
   );
