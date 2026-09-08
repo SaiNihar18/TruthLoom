@@ -42,7 +42,81 @@ A note on free tier limits: Gemini's free tier caps at around 20 requests per da
 
 [link to be added]
 
+## The Four Required Cases
+
+Quick reference for where each one lives in the running app (Findings tab, filtered).
+
+| # | Case | Example | Where to look |
+|---|------|---------|----------------|
+| 1 | Corroborated across documents | IMF and RBI independently report the same 6.5% real GDP growth for FY2024-25, worded completely differently | Findings → Corroborated |
+| 2 | Genuine or likely contradiction | RBI's own Monetary Policy Committee projection (4.8%) vs. a separate RBI Annual Report projection (4.0%), shown as *likely* rather than certain since the fiscal year labels ("FY25" vs "2025-26") are genuinely ambiguous across institutional convention | Findings → Contradictions |
+| 3 | Apparent contradiction explained by context | 6.4% vs. 6.5% real GDP growth for the same period, explained as a provisional first estimate vs. a later revised figure | Findings → Reconciled |
+| 4 | Extraction or reasoning failure, found and handled | ~40% of one document's facts came back unverifiable; root cause was that curated excerpts splice non-contiguous page ranges from a longer original report, so a page printed "44" can sit anywhere in the file. Fixed by resolving the model's printed page number against each page's own header/footer, recovering the grounded rate from 57% to 97% | Findings → Needs review (residual cases), full story in Additional Notes and the git history |
+
 ## Approach
+
+### Tech stack
+
+| Layer | Technology | Why |
+|---|---|---|
+| Backend | FastAPI (Python) | Async-friendly, minimal boilerplate, good fit for a PDF/LLM pipeline |
+| PDF text & geometry | PyMuPDF (fitz) | Reads the embedded text layer and exact coordinates for grounding, renders pages to images for display |
+| Fact extraction | Gemini (`gemini-3.6-flash`) | Native multimodal PDF understanding in one call, no manual OCR or per-page requests |
+| Extraction fallback | OpenRouter (vision model) | Second free-tier pool for when Gemini is rate limited or over quota |
+| Cross-document reasoning | Groq (`openai/gpt-oss-20b`) | Fast, free-tier inference for the corroborate/contradict/reconcile classification |
+| Reasoning fallback | OpenRouter (text model) | Second free-tier pool for the reasoning step |
+| Embeddings | sentence-transformers (local) | Candidate matching without a third API or rate limit |
+| Storage | SQLite | Zero-setup, flexible JSON-friendly fact records, fine for a local prototype |
+| Frontend | React + Vite | Small, fast dev loop for an evidence browser and findings list |
+
+No graph database, per the assignment's own note that one isn't the solution by itself.
+
+### Architecture
+
+```mermaid
+flowchart LR
+    U[PDF upload] --> X[Gemini extraction<br/>one call, whole document]
+    X -->|OR if rate limited| XF[OpenRouter vision fallback]
+    X --> G[Grounding<br/>verify quote against PyMuPDF text layer]
+    XF --> G
+    G --> DB[(SQLite<br/>facts + documents)]
+    DB --> EMB[Local embedding<br/>sentence-transformers]
+    EMB --> CAND[Candidate matches<br/>from other documents]
+    CAND --> R[Groq reasoning<br/>corroborate / contradict / reconcile]
+    R -->|OR if rate limited| RF[OpenRouter text fallback]
+    R --> DB
+    RF --> DB
+    DB --> UI1[Documents view<br/>facts + evidence]
+    DB --> UI2[Findings view<br/>cross-document cases]
+```
+
+### Request lifecycle
+
+The upload response doesn't wait on cross-document reasoning, it's the slower, more rate-limit-sensitive step, so it runs after the response is already sent.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API as FastAPI
+    participant LLM as Gemini
+    participant DB as SQLite
+    participant BG as Background task
+    participant Reason as Groq
+
+    Browser->>API: POST /documents (PDF)
+    API->>LLM: extract facts (1 call)
+    LLM-->>API: facts JSON
+    API->>API: ground each quote against PDF text
+    API->>DB: store document + facts
+    API-->>Browser: facts returned (grounded/partial/unverified)
+    API->>BG: queue relationship classification
+    BG->>Reason: batched comparison calls
+    Reason-->>BG: corroborates / contradicts / reconcilable
+    BG->>DB: store relationships
+    Note over Browser,DB: Findings tab picks these up on refresh
+```
+
+### Decisions and trade-offs
 
 **Extraction.** Gemini reads the whole PDF in a single API call using its native multimodal document understanding, no OCR and no per-page calls. It returns a JSON list of facts as `{subject, predicate, value, unit, time_period, scope, quote, page}`, where `quote` is meant to be a verbatim phrase from the source and `page` is whatever page number the model read off the document. If Gemini is unavailable, a vision fallback (OpenRouter) renders pages to images and does the same job.
 
