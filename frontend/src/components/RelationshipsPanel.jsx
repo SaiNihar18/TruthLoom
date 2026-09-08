@@ -1,13 +1,8 @@
 import { useEffect, useState } from "react";
 import { getFactRelationships } from "../api";
+import { statusInfo } from "../factStatus";
 
-const BADGE_CLASS = {
-  corroborates: "badge badge-ok",
-  contradicts: "badge badge-danger",
-  reconcilable: "badge badge-caution",
-};
-
-export default function RelationshipsPanel({ fact }) {
+export default function RelationshipsPanel({ fact, onOpenFact }) {
   const [relationships, setRelationships] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -27,25 +22,40 @@ export default function RelationshipsPanel({ fact }) {
   if (loading) return <p className="empty-hint">Checking other documents...</p>;
 
   if (relationships.length === 0) {
-    return <p className="empty-hint">No matching facts found in other documents yet.</p>;
+    return (
+      <div className="related-empty">
+        <p className="empty-hint">No related facts found</p>
+        <p className="section-intro">This fact has not been matched with information from another document.</p>
+      </div>
+    );
   }
 
   return (
-    <ul className="relationship-list">
-      {relationships.map((rel, index) => (
-        <li key={index} className="relationship-card">
-          <span className={BADGE_CLASS[rel.relationship_type] || "badge"}>
-            {rel.relationship_type}
-          </span>
-          <p className="relationship-fact">
-            <strong>{rel.other_fact.subject}</strong> &middot; {rel.other_fact.predicate}:{" "}
-            {rel.other_fact.value} {rel.other_fact.unit || ""}
-            {rel.other_fact.time_period ? ` (${rel.other_fact.time_period})` : ""}
-          </p>
-          <p className="relationship-source">from {rel.other_fact.document_filename}</p>
-          <p className="relationship-explanation">{rel.explanation}</p>
-        </li>
-      ))}
-    </ul>
+    <div className="related-list">
+      {relationships.map((rel, index) => {
+        const info = statusInfo(rel.relationship_type);
+        const other = rel.other_fact;
+        return (
+          <div key={index} className="related-item">
+            <div className="related-item-header">
+              <span className={`status-text ${info.className}`}>{info.label}</span>
+              <span className="evidence-source-line">
+                {other.document_filename} · Page {other.page ?? "-"}
+              </span>
+            </div>
+            <blockquote className="evidence-quote small">{other.quote}</blockquote>
+            {onOpenFact && (
+              <button className="link-button" onClick={() => onOpenFact(other.document_id, other.id)}>
+                Open comparison →
+              </button>
+            )}
+            <p className="related-why">
+              <span className="related-why-label">Why this matches</span>
+              {rel.explanation}
+            </p>
+          </div>
+        );
+      })}
+    </div>
   );
 }

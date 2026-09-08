@@ -27,7 +27,7 @@ export default function UploadPanel({ onUploaded }) {
   return (
     <div className="upload-panel">
       <label className="upload-button">
-        {status === "uploading" ? "Extracting facts..." : "Upload a PDF"}
+        {status === "uploading" ? "Extracting facts..." : "+ Add documents"}
         <input
           ref={inputRef}
           type="file"

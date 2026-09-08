@@ -1,71 +1,70 @@
 import { useState } from "react";
-
-const RELATIONSHIP_INFO = {
-  corroborates: {
-    label: "Corroborates",
-    badgeClass: "badge badge-ok",
-    blurb: "The same underlying claim, stated independently in two documents.",
-  },
-  contradicts: {
-    label: "Contradicts",
-    badgeClass: "badge badge-danger",
-    blurb: "Two documents make incompatible claims that time, scope, or units don't explain.",
-  },
-  reconcilable: {
-    label: "Reconcilable",
-    badgeClass: "badge badge-caution",
-    blurb: "Looks like a mismatch, but is explained by a different period, scope, or unit.",
-  },
-};
+import { statusInfo } from "../factStatus";
 
 const FILTERS = [
-  { key: "all", label: "All findings" },
-  { key: "corroborates", label: "Corroborations" },
+  { key: "all", label: "All" },
+  { key: "corroborates", label: "Corroborated" },
   { key: "contradicts", label: "Contradictions" },
   { key: "reconcilable", label: "Reconciled" },
-  { key: "issues", label: "Extraction issues" },
+  { key: "issues", label: "Needs review" },
 ];
 
-function FactChip({ fact, onView }) {
+function factLine(fact) {
+  const context = [fact.time_period, fact.scope].filter(Boolean).join(" · ");
   return (
-    <button className="fact-chip" onClick={() => onView(fact.document_id, fact.id)}>
-      <span className="fact-chip-doc">{fact.document_filename}</span>
-      <span className="fact-chip-body">
-        <strong>{fact.subject}</strong> &middot; {fact.predicate}: {fact.value} {fact.unit || ""}
-        {fact.time_period ? ` (${fact.time_period})` : ""}
-      </span>
-    </button>
+    <span>
+      <strong>{fact.value} {fact.unit || ""}</strong>
+      {context ? <span className="muted"> &middot; {context}</span> : null}
+    </span>
   );
 }
 
-function RelationshipCard({ relationship, onViewFact }) {
-  const info = RELATIONSHIP_INFO[relationship.relationship_type];
-  if (!relationship.fact_a || !relationship.fact_b) return null;
+function RelationshipRow({ relationship, onOpenFact }) {
+  const { fact_a, fact_b, relationship_type, explanation } = relationship;
+  if (!fact_a || !fact_b) return null;
+  const info = statusInfo(relationship_type);
+  const sameName = fact_a.predicate === fact_b.predicate;
+
   return (
-    <li className="finding-card">
-      <span className={info.badgeClass}>{info.label}</span>
-      <div className="finding-pair">
-        <FactChip fact={relationship.fact_a} onView={onViewFact} />
-        <FactChip fact={relationship.fact_b} onView={onViewFact} />
+    <li className="finding-row">
+      <span className={`finding-kicker ${info.className}`}>{info.label}</span>
+      <div className="finding-title">{sameName ? fact_a.predicate : `${fact_a.predicate} / ${fact_b.predicate}`}</div>
+      <div className="finding-values">
+        <button className="link-button plain" onClick={() => onOpenFact(fact_a.document_id, fact_a.id)}>
+          {factLine(fact_a)} <span className="muted">&mdash; {fact_a.document_filename}</span>
+        </button>
+        <button className="link-button plain" onClick={() => onOpenFact(fact_b.document_id, fact_b.id)}>
+          {factLine(fact_b)} <span className="muted">&mdash; {fact_b.document_filename}</span>
+        </button>
       </div>
-      <p className="finding-explanation">{relationship.explanation}</p>
+      <p className="finding-explanation">{explanation}</p>
     </li>
   );
 }
 
-function IssueCard({ fact, onViewFact }) {
-  const reason = !fact.grounded
-    ? "Could not be verified against the PDF's text layer at all."
-    : "Only partially matched the PDF's text layer, treat with lower confidence.";
+function IssueRow({ fact, onOpenFact }) {
+  const isMissing = !fact.grounded;
+  const why = isMissing
+    ? "This figure could not be located in the source PDF's text layer at all. It may come from a table or chart the model paraphrased rather than quoted, or the extraction may simply be wrong."
+    : "Only part of the surrounding sentence matched the PDF exactly, often because the source text is spread across a table and the model combined it into one line. Treat the value with lower confidence until checked.";
+
   return (
-    <li className="finding-card">
-      <span className={!fact.grounded ? "badge badge-warn" : "badge badge-caution"}>
-        {!fact.grounded ? "Not grounded" : "Partial match"}
-      </span>
-      <div className="finding-pair">
-        <FactChip fact={fact} onView={onViewFact} />
+    <li className="finding-row">
+      <span className="finding-kicker status-warn">Needs review</span>
+      <div className="finding-title">
+        {fact.predicate}: {fact.value} {fact.unit || ""}
       </div>
-      <p className="finding-explanation">{reason}</p>
+      <p className="finding-explanation">
+        <strong>What was extracted:</strong> {fact.subject} &middot; {fact.predicate} &middot; {fact.value}{" "}
+        {fact.unit || ""} {fact.time_period ? `(${fact.time_period})` : ""}
+        <br />
+        <strong>Why it's uncertain:</strong> {why}
+        <br />
+        <strong>Source:</strong> {fact.document_filename}, page {fact.page ?? "unknown"}
+      </p>
+      <button className="link-button" onClick={() => onOpenFact(fact.document_id, fact.id)}>
+        Open source →
+      </button>
     </li>
   );
 }
@@ -75,14 +74,6 @@ export default function FindingsView({ facts, relationships, onViewFact, onRefre
 
   const issueFacts = facts.filter((f) => !f.grounded || f.partial_grounding);
 
-  const filteredRelationships =
-    filter === "all" || filter === "issues"
-      ? relationships
-      : relationships.filter((r) => r.relationship_type === filter);
-
-  const showRelationships = filter !== "issues";
-  const showIssues = filter === "all" || filter === "issues";
-
   const counts = {
     all: relationships.length + issueFacts.length,
     corroborates: relationships.filter((r) => r.relationship_type === "corroborates").length,
@@ -91,21 +82,22 @@ export default function FindingsView({ facts, relationships, onViewFact, onRefre
     issues: issueFacts.length,
   };
 
+  const showRelationships = filter !== "issues";
+  const showIssues = filter === "all" || filter === "issues";
+  const filteredRelationships =
+    filter === "all" || filter === "issues" ? relationships : relationships.filter((r) => r.relationship_type === filter);
+
   const nothingToShow =
-    (filter === "all" && relationships.length === 0 && issueFacts.length === 0) ||
-    (filter !== "all" && filter !== "issues" && filteredRelationships.length === 0) ||
-    (filter === "issues" && issueFacts.length === 0);
+    (showRelationships ? filteredRelationships.length === 0 : true) && (showIssues ? issueFacts.length === 0 : true);
 
   return (
     <div className="findings-view">
       <div className="findings-header">
         <p className="section-intro">
-          Every corroboration, contradiction, and context-explained difference the system found
-          across documents, plus any fact it couldn't fully verify. Click a fact to jump to its
-          source evidence. Cross-document comparisons run in the background after upload, so
-          refresh if you just added a document.
+          What TruthLoom found when it checked facts against each other across documents.
+          Comparisons run in the background after upload, refresh if you just added one.
         </p>
-        <button className="refresh-button" onClick={onRefresh}>
+        <button className="link-button" onClick={onRefresh}>
           Refresh
         </button>
       </div>
@@ -114,10 +106,10 @@ export default function FindingsView({ facts, relationships, onViewFact, onRefre
         {FILTERS.map((f) => (
           <button
             key={f.key}
-            className={filter === f.key ? "filter-chip active" : "filter-chip"}
+            className={filter === f.key ? "filter-link active" : "filter-link"}
             onClick={() => setFilter(f.key)}
           >
-            {f.label} <span className="filter-count">{counts[f.key]}</span>
+            {f.label} <span className="muted">{counts[f.key]}</span>
           </button>
         ))}
       </div>
@@ -126,17 +118,16 @@ export default function FindingsView({ facts, relationships, onViewFact, onRefre
         <p className="empty-hint">
           {relationships.length === 0 && issueFacts.length === 0
             ? "Upload at least two related documents to see corroborations, contradictions, and reconciled differences here."
-            : "Nothing in this category yet."}
+            : "Nothing in this category."}
         </p>
       )}
 
       <ul className="finding-list">
         {showRelationships &&
           filteredRelationships.map((rel) => (
-            <RelationshipCard key={rel.id} relationship={rel} onViewFact={onViewFact} />
+            <RelationshipRow key={rel.id} relationship={rel} onOpenFact={onViewFact} />
           ))}
-        {showIssues &&
-          issueFacts.map((fact) => <IssueCard key={`issue-${fact.id}`} fact={fact} onViewFact={onViewFact} />)}
+        {showIssues && issueFacts.map((fact) => <IssueRow key={`issue-${fact.id}`} fact={fact} onOpenFact={onViewFact} />)}
       </ul>
     </div>
   );

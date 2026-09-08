@@ -1,10 +1,11 @@
-function groundingLabel(fact) {
-  if (!fact.grounded) return { text: "not grounded", className: "badge badge-warn" };
-  if (fact.partial_grounding) return { text: "partial match", className: "badge badge-caution" };
-  return { text: "grounded", className: "badge badge-ok" };
+import { getFactRelationshipSummary } from "../factStatus";
+
+function contextLine(fact) {
+  const parts = [fact.subject, fact.time_period, fact.scope].filter(Boolean);
+  return parts.join(" · ");
 }
 
-export default function FactsTable({ facts, selectedFactId, onSelect }) {
+export default function FactsTable({ facts, relationships, selectedFactId, onSelect }) {
   if (facts.length === 0) {
     return <p className="empty-hint">This document has no extracted facts.</p>;
   }
@@ -14,34 +15,40 @@ export default function FactsTable({ facts, selectedFactId, onSelect }) {
       <table className="facts-table">
         <thead>
           <tr>
-            <th>Subject</th>
-            <th>Predicate</th>
+            <th>Fact</th>
             <th>Value</th>
-            <th>Period</th>
-            <th>Scope</th>
-            <th>Page</th>
-            <th>Evidence</th>
+            <th>Context</th>
+            <th>Source</th>
+            <th>Status</th>
           </tr>
         </thead>
         <tbody>
           {facts.map((fact) => {
-            const grounding = groundingLabel(fact);
+            const summary = getFactRelationshipSummary(fact.id, relationships);
             return (
               <tr
                 key={fact.id}
                 className={fact.id === selectedFactId ? "fact-row selected" : "fact-row"}
                 onClick={() => onSelect(fact)}
               >
-                <td>{fact.subject}</td>
-                <td>{fact.predicate}</td>
-                <td>
+                <td className="fact-cell-name">{fact.predicate}</td>
+                <td className="fact-cell-value">
                   {fact.value} {fact.unit || ""}
                 </td>
-                <td>{fact.time_period || "-"}</td>
-                <td>{fact.scope || "-"}</td>
-                <td>{fact.page ?? "-"}</td>
+                <td className="fact-cell-context">{contextLine(fact)}</td>
+                <td className="fact-cell-source">
+                  {fact.page != null ? `p. ${fact.page}` : "-"}
+                  {!fact.grounded && <span className="dot-flag" title="Not grounded" />}
+                  {fact.grounded && fact.partial_grounding && (
+                    <span className="dot-flag caution" title="Partial match" />
+                  )}
+                </td>
                 <td>
-                  <span className={grounding.className}>{grounding.text}</span>
+                  {summary ? (
+                    <span className={`status-text ${summary.className}`}>{summary.label}</span>
+                  ) : (
+                    <span className="status-text status-muted">-</span>
+                  )}
                 </td>
               </tr>
             );

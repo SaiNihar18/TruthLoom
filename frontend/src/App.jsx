@@ -5,7 +5,7 @@ import DocumentList from "./components/DocumentList";
 import FactsTable from "./components/FactsTable";
 import EvidenceViewer from "./components/EvidenceViewer";
 import RelationshipsPanel from "./components/RelationshipsPanel";
-import StatsBar from "./components/StatsBar";
+import SummaryLine from "./components/SummaryLine";
 import FindingsView from "./components/FindingsView";
 import { listDocuments, getDocumentFacts, getAllFacts, getAllRelationships } from "./api";
 
@@ -33,7 +33,10 @@ export default function App() {
       return;
     }
     getDocumentFacts(selectedDocumentId)
-      .then(setFacts)
+      .then((data) => {
+        setFacts(data);
+        setLoadError(null);
+      })
       .catch((err) => setLoadError(err.message));
   }, [selectedDocumentId]);
 
@@ -47,14 +50,13 @@ export default function App() {
   }, [facts, pendingFactId]);
 
   function refreshEverything() {
-    listDocuments()
-      .then(setDocuments)
-      .catch((err) => setLoadError(err.message));
-    getAllFacts()
-      .then(setAllFacts)
-      .catch((err) => setLoadError(err.message));
-    getAllRelationships()
-      .then(setAllRelationships)
+    Promise.all([listDocuments(), getAllFacts(), getAllRelationships()])
+      .then(([docs, facts, relationships]) => {
+        setDocuments(docs);
+        setAllFacts(facts);
+        setAllRelationships(relationships);
+        setLoadError(null);
+      })
       .catch((err) => setLoadError(err.message));
   }
 
@@ -67,20 +69,18 @@ export default function App() {
   function goToFact(documentId, factId) {
     setActiveTab("documents");
     setSelectedFact(null);
-    if (documentId === selectedDocumentId) {
-      setPendingFactId(factId);
-    } else {
-      setSelectedDocumentId(documentId);
-      setPendingFactId(factId);
-    }
+    setSelectedDocumentId(documentId);
+    setPendingFactId(factId);
   }
+
+  const selectedDocument = documents.find((d) => d.id === selectedDocumentId);
 
   return (
     <div className="app-shell">
       <header className="top-bar">
         <div className="brand">
           <h1>TruthLoom</h1>
-          <p className="tagline">Evidence-grounded facts, checked against each other across documents</p>
+          <p className="tagline">A document intelligence workspace for checking facts against each other</p>
         </div>
         <nav className="tab-switcher">
           <button
@@ -98,9 +98,16 @@ export default function App() {
         </nav>
       </header>
 
-      <StatsBar documents={documents} facts={allFacts} relationships={allRelationships} />
+      <SummaryLine documents={documents} facts={allFacts} relationships={allRelationships} />
 
-      {loadError && <p className="upload-error top-level-error">{loadError}</p>}
+      {loadError && (
+        <div className="inline-error">
+          <span>Couldn't load the latest data: {loadError}</span>
+          <button className="link-button" onClick={refreshEverything}>
+            Retry
+          </button>
+        </div>
+      )}
 
       {activeTab === "documents" ? (
         <div className="documents-tab">
@@ -120,8 +127,7 @@ export default function App() {
           <main className="main-content">
             {!selectedDocumentId && (
               <p className="empty-hint large">
-                Select a document on the left, or upload a new PDF, to see the facts extracted
-                from it.
+                Select a document on the left, or add one, to see the facts extracted from it.
               </p>
             )}
 
@@ -129,11 +135,15 @@ export default function App() {
               <section className="facts-section">
                 <h2>Extracted facts</h2>
                 <p className="section-intro">
-                  Each fact is linked to the exact sentence or figure in the source PDF that
-                  supports it. Click a row to see that evidence and anything it corroborates,
-                  contradicts, or reconciles with in other documents.
+                  Each fact links to the sentence or figure that supports it. Select one to see its
+                  evidence and how it compares with other documents.
                 </p>
-                <FactsTable facts={facts} selectedFactId={selectedFact?.id} onSelect={setSelectedFact} />
+                <FactsTable
+                  facts={facts}
+                  relationships={allRelationships}
+                  selectedFactId={selectedFact?.id}
+                  onSelect={setSelectedFact}
+                />
               </section>
             )}
 
@@ -141,11 +151,15 @@ export default function App() {
               <section className="detail-section">
                 <div className="evidence-column">
                   <h2>Source evidence</h2>
-                  <EvidenceViewer documentId={selectedDocumentId} fact={selectedFact} />
+                  <EvidenceViewer
+                    documentId={selectedDocumentId}
+                    documentName={selectedDocument ? selectedDocument.filename : ""}
+                    fact={selectedFact}
+                  />
                 </div>
                 <div className="relationships-column">
-                  <h2>Related facts in other documents</h2>
-                  <RelationshipsPanel fact={selectedFact} />
+                  <h2>Related information</h2>
+                  <RelationshipsPanel fact={selectedFact} onOpenFact={goToFact} />
                 </div>
               </section>
             )}
