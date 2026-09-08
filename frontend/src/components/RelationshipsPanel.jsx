@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getFactRelationships } from "../api";
 import { statusInfo } from "../factStatus";
+import LoadingLine from "./LoadingLine";
 
 export default function RelationshipsPanel({ fact, onOpenFact }) {
   const [relationships, setRelationships] = useState([]);
@@ -19,7 +20,7 @@ export default function RelationshipsPanel({ fact, onOpenFact }) {
 
   if (!fact) return null;
 
-  if (loading) return <p className="empty-hint">Checking other documents...</p>;
+  if (loading) return <LoadingLine text="Checking other documents..." />;
 
   if (relationships.length === 0) {
     return (
@@ -31,7 +32,7 @@ export default function RelationshipsPanel({ fact, onOpenFact }) {
   }
 
   return (
-    <div className="related-list">
+    <div className="related-list fade-in" key={fact.id}>
       {relationships.map((rel, index) => {
         const info = statusInfo(rel.relationship_type);
         const other = rel.other_fact;

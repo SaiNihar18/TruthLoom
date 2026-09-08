@@ -7,6 +7,7 @@ import EvidenceViewer from "./components/EvidenceViewer";
 import RelationshipsPanel from "./components/RelationshipsPanel";
 import SummaryLine from "./components/SummaryLine";
 import FindingsView from "./components/FindingsView";
+import LoadingLine from "./components/LoadingLine";
 import { listDocuments, getDocumentFacts, getAllFacts, getAllRelationships } from "./api";
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
   const [documents, setDocuments] = useState([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const [facts, setFacts] = useState([]);
+  const [factsLoading, setFactsLoading] = useState(false);
   const [selectedFact, setSelectedFact] = useState(null);
   const [pendingFactId, setPendingFactId] = useState(null);
 
@@ -32,12 +34,14 @@ export default function App() {
       setFacts([]);
       return;
     }
+    setFactsLoading(true);
     getDocumentFacts(selectedDocumentId)
       .then((data) => {
         setFacts(data);
         setLoadError(null);
       })
-      .catch((err) => setLoadError(err.message));
+      .catch((err) => setLoadError(err.message))
+      .finally(() => setFactsLoading(false));
   }, [selectedDocumentId]);
 
   useEffect(() => {
@@ -110,7 +114,7 @@ export default function App() {
       )}
 
       {activeTab === "documents" ? (
-        <div className="documents-tab">
+        <div className="documents-tab fade-in">
           <aside className="sidebar">
             <UploadPanel onUploaded={handleUploaded} />
             <h3 className="sidebar-heading">Documents</h3>
@@ -132,23 +136,27 @@ export default function App() {
             )}
 
             {selectedDocumentId && (
-              <section className="facts-section">
+              <section className="facts-section fade-in" key={`facts-${selectedDocumentId}`}>
                 <h2>Extracted facts</h2>
                 <p className="section-intro">
                   Each fact links to the sentence or figure that supports it. Select one to see its
                   evidence and how it compares with other documents.
                 </p>
-                <FactsTable
-                  facts={facts}
-                  relationships={allRelationships}
-                  selectedFactId={selectedFact?.id}
-                  onSelect={setSelectedFact}
-                />
+                {factsLoading ? (
+                  <LoadingLine text="Extracting facts..." />
+                ) : (
+                  <FactsTable
+                    facts={facts}
+                    relationships={allRelationships}
+                    selectedFactId={selectedFact?.id}
+                    onSelect={setSelectedFact}
+                  />
+                )}
               </section>
             )}
 
             {selectedFact && (
-              <section className="detail-section">
+              <section className="detail-section fade-in" key={`detail-${selectedFact.id}`}>
                 <div className="evidence-column">
                   <h2>Source evidence</h2>
                   <EvidenceViewer
@@ -166,7 +174,7 @@ export default function App() {
           </main>
         </div>
       ) : (
-        <main className="main-content findings-tab">
+        <main className="main-content findings-tab fade-in">
           <FindingsView
             facts={allFacts}
             relationships={allRelationships}

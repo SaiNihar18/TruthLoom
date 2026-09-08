@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getPageMeta, pageImageUrl } from "../api";
+import LoadingLine from "./LoadingLine";
 
 const CROP_HEIGHT = 220;
 
@@ -7,11 +8,13 @@ export default function EvidenceViewer({ documentId, documentName, fact }) {
   const [meta, setMeta] = useState(null);
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
     setMeta(null);
     setError(null);
     setExpanded(false);
+    setImageLoaded(false);
     if (!fact || !fact.page) return;
     getPageMeta(documentId, fact.page)
       .then(setMeta)
@@ -34,7 +37,7 @@ export default function EvidenceViewer({ documentId, documentName, fact }) {
   }
 
   return (
-    <div className="evidence-viewer">
+    <div className="evidence-viewer fade-in" key={fact.id}>
       <div className="evidence-source-line">
         {documentName ? `${documentName}` : ""}
         {fact.page ? ` · Page ${fact.page}` : ""}
@@ -56,12 +59,16 @@ export default function EvidenceViewer({ documentId, documentName, fact }) {
 
       {error && <p className="upload-error">Could not load page: {error}</p>}
 
+      {fact.page && !error && !meta && <LoadingLine text="Loading page..." />}
+
       {fact.page && !error && meta && (
         <>
           <div className="evidence-crop" style={{ height: CROP_HEIGHT }}>
             <img
               src={pageImageUrl(documentId, fact.page)}
               alt={`Page ${fact.page}`}
+              onLoad={() => setImageLoaded(true)}
+              className={imageLoaded ? "page-image loaded" : "page-image"}
               style={{ position: "absolute", top: cropOffsetY, left: 0, width: imageWidth }}
             />
             {bbox && (
@@ -83,8 +90,8 @@ export default function EvidenceViewer({ documentId, documentName, fact }) {
       )}
 
       {expanded && meta && (
-        <div className="page-frame" style={{ width: imageWidth }}>
-          <img src={pageImageUrl(documentId, fact.page)} alt={`Page ${fact.page} full`} />
+        <div className="page-frame fade-in" style={{ width: imageWidth }}>
+          <img src={pageImageUrl(documentId, fact.page)} alt={`Page ${fact.page} full`} className="page-image loaded" />
           {bbox && (
             <div
               className={bbox.partial ? "highlight-box partial" : "highlight-box"}

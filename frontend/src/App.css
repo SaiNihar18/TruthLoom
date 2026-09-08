@@ -17,6 +17,67 @@ body {
   background: var(--canvas);
 }
 
+/* Motion: a quiet fade for content that swaps in, never a bounce or slide */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.loading-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.page-image {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.page-image.loaded {
+  opacity: 1;
+}
+
+/* Consistent, quick transitions on anything interactive, so state changes
+   settle instead of snapping. */
+button,
+.document-item,
+.fact-row,
+.upload-button,
+a {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
 .app-shell {
   max-width: 1240px;
   margin: 0 auto;
@@ -142,10 +203,16 @@ body {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(30, 20, 60, 0.12);
 }
 
 .upload-button:hover {
   background: var(--accent-dark);
+}
+
+.upload-button:has(input:disabled) {
+  opacity: 0.7;
+  cursor: default;
 }
 
 .upload-hint {
@@ -405,27 +472,31 @@ body {
   position: relative;
   border: 1px solid var(--line);
   border-radius: 6px;
-  overflow: hidden;
-  max-width: 100%;
+  overflow-x: auto;
   margin-top: 8px;
+  background: #fafafc;
 }
 
 .page-frame img {
   display: block;
-  width: 100%;
-  height: auto;
+  /* Deliberately no width:100% here. The highlight box below is positioned
+     in the image's natural pixel coordinates (computed from the PDF's own
+     point coordinates times the render scale), so the image has to render
+     at that same natural size or the box drifts away from the text it's
+     supposed to mark. Scrolls horizontally instead of shrinking to fit. */
 }
 
 .highlight-box {
   position: absolute;
-  border: 2px solid #d64541;
-  background: rgba(214, 69, 65, 0.14);
+  border: 2px solid #f2c14e;
+  background: rgba(242, 193, 78, 0.32);
   pointer-events: none;
+  border-radius: 2px;
 }
 
 .highlight-box.partial {
-  border-color: #c98a1f;
-  background: rgba(201, 138, 31, 0.16);
+  border-color: #e0932b;
+  background: rgba(224, 147, 43, 0.28);
 }
 
 .link-button {
